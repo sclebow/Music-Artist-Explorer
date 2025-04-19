@@ -1,9 +1,8 @@
 streamlit 
 pandas
 numpy 
-matplotlib.pyplot 
+matplotlib 
 seaborn 
-networkx 
-matplotlib.patches 
+networkx  
 random
 io
