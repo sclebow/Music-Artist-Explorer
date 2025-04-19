@@ -6,6 +6,7 @@ import seaborn as sns
 import networkx as nx
 import matplotlib.patches as mpatches
 import random
+import io
 
 def get_neighbors(n_graph, artist, max_depth=1):
     """
@@ -67,28 +68,35 @@ def generate_graph(center_artist, max_depth, mention_threshold, show_plot=False,
     # Create a graph object
     graph = nx.DiGraph()
 
-    df = pd.read_csv('wikipedia_music.csv')
+    df = pd.read_csv('wikipedia_music_graph.csv') # Columns source,target,number_of_mentions
 
     total_lines = len(df)
     print(f'Total lines: {total_lines}')
 
+    # Drop lines below the mention threshold
+    df = df[df['number_of_mentions'] >= mention_threshold]
+    print(f'Lines after filtering by mention threshold: {len(df)}')
+
+    # Create a streamlit progress bar
+    progress_bar = st.progress(0)
+
     # Add nodes and edges based on your DataFrame
-    # Example, assuming columns 'source' and 'target':
     for index, row in df.iterrows():
-        source = row['ARTIST_NAME']
-        try:
-            targets_0 = row['MENTIONED_ARTISTS'].split(';')
-            # print(f'targets_0: {targets_0}')
-            for t in targets_0:
-                number_of_mentions = t.split(':')[1]
-                if int(number_of_mentions) >= mention_threshold:
-                    graph.add_edge(source, t.split(':')[0], weight=int(number_of_mentions))
-        except:
-            pass
+        source = row['source']
+        target = row['target']
+        number_of_mentions = row['number_of_mentions']
+        
+        # Add nodes and edges to the graph
+        graph.add_node(source)
+        graph.add_node(target)
+        graph.add_edge(source, target, weight=number_of_mentions)
 
-        # Print progress bar
         print(f'Progress: {index / total_lines:.2%}', end='\r')# Get subgraph nodes and styling information
+        # Update progress bar
+        progress_bar.progress((index + 1) / total_lines)
 
+    # Close the progress bar
+    progress_bar.empty()
 
     subgraph_nodes, node_sizes, node_colors, node_depths = get_neighbors(graph, center_artist, max_depth)
     subgraph_nodes.add(center_artist)  # Include the center artist
@@ -146,7 +154,7 @@ def generate_graph(center_artist, max_depth, mention_threshold, show_plot=False,
                 y + random.uniform(-jitter_amount, jitter_amount)
             )
 
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(10, 8))
 
     # Draw nodes with varying sizes and colors
     nx.draw_networkx_nodes(subgraph, pos, 
@@ -255,16 +263,16 @@ def generate_graph(center_artist, max_depth, mention_threshold, show_plot=False,
     plt.axis('off')  # Turn off axis
     plt.tight_layout()
 
-    if save_plot:
-        # Save the figure as a PNG file
-        file_name = f'{center_artist}_{max_depth}_depth_{mention_threshold}_mention_threshold_subgraph.png'
-        plt.savefig(f'images/{file_name}', format='png', dpi=300, bbox_inches='tight')
-        print(f"Graph saved as {file_name}")
+    # if save_plot:
+    #     # Save the figure as a PNG file
+    #     file_name = f'{center_artist}_{max_depth}_depth_{mention_threshold}_mention_threshold_subgraph.png'
+    #     plt.savefig(f'images/{file_name}', format='png', dpi=300, bbox_inches='tight')
+    #     print(f"Graph saved as {file_name}")
 
-    if show_plot:
-        plt.show()
+    # if show_plot:
+    #     plt.show()
 
-    # plt.close()
+    # # plt.close()
     return plt
 
 def get_random_artist():
@@ -278,6 +286,8 @@ def get_random_artist():
 # Streamlit app
 # Set page configuration
 st.set_page_config(page_title="Musical Artist Connectivity Analysis", layout="wide")
+# Load CSS styles
+st.markdown('<style>' + open('styles.css').read() + '</style>', unsafe_allow_html=True) 
 
 st.title("Musical Artist Connectivity Analysis")
 st.write("This app analyzes the connections between musical artists based on their Wikipedia pages.  It uses a dataset of artists and their connections to visualize the relationships between them.")
@@ -307,7 +317,7 @@ col1, col2 = st.columns(2, vertical_alignment="bottom")
 with col1:
     mention_threshold = st.slider("Minimum mention threshold:", min_value=1, max_value=20, value=1, step=1, help="Minimum number of mentions to consider an artist connected.")
 with col2:
-    max_depth = st.slider("Maximum depth of connections:", min_value=1, max_value=5, value=2, step=1, help="Maximum depth of connections to visualize.")
+    max_depth = st.slider("Maximum depth of connections:", min_value=1, max_value=10, value=2, step=1, help="Maximum depth of connections to visualize.")
 
 if random_artist:
     artist = get_random_artist()
@@ -320,22 +330,25 @@ if random_artist:
 st.markdown(f"## Selected artist: {artist}")
 
 # Generate the graph based on the selected artist and parameters
-if st.button("Generate graph", help="Click to generate the graph based on the selected artist and parameters.", key="generate_graph"):
+# if st.button("Generate graph", help="Click to generate the graph based on the selected artist and parameters.", key="generate_graph"):
+if True:  # Always generate the graph for demonstration purposes
     with st.spinner("Generating graph... (this may take a few seconds depending on the artist, threshold, and depth)"):
         plot = generate_graph(artist, max_depth, mention_threshold, show_plot=False, save_plot=False)
-        st.success("Graph generated successfully!")
-        st.pyplot(plot, use_container_width=False)  # Display the plot in Streamlit
+        success_message = st.success("Graph generated successfully!") # Show success message
+        st.pyplot(plot, use_container_width=False)  # Adjusted to use the container width
 
         st.balloons()  # Show balloons animation when the graph is generated
-        st.markdown("### Graph generated successfully!")
+        # Remove the success message after a few seconds
+        success_message.empty()
 
         # Add download button for the graph, set the dpi to 300 for better quality
         file_name = f'{artist}_{max_depth}_depth_{mention_threshold}_mention_threshold_subgraph.png'
-        with open(f'images/{file_name}', 'rb') as f:
-            st.download_button(
-                label="Download graph",
-                data=f,
-                file_name=file_name,
-                mime="image/png",
-                help="Click to download the generated graph as a PNG file."
-            )
+        img = io.BytesIO()
+        plot.savefig(img, format='png', dpi=300, bbox_inches='tight')
+        st.download_button(
+            label="Download graph",
+            data=img,  # Get the figure as a PNG image
+            file_name=file_name,
+            mime="image/png",
+            help="Click to download the generated graph as a PNG file."
+        )

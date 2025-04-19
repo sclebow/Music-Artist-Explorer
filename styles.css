@@ -1,0 +1,11 @@
+/* Style for st.pyplot container */
+.stImage {
+    display: flex;
+    max-width: 70%;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid rgb(156, 156, 156);
+    border-radius: 10px;
+    padding: 10px;
+    margin: 20px auto;
+}
