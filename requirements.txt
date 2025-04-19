@@ -1,8 +1,5 @@
-streamlit 
 pandas
-numpy 
-matplotlib 
-seaborn 
-networkx  
-random
-io
+numpy
+matplotlib
+seaborn
+networkx
