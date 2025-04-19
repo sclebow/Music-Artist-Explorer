@@ -8,7 +8,59 @@ import matplotlib.patches as mpatches
 import random
 import io
 
-def get_neighbors(n_graph, artist, max_depth=1):
+# def get_neighbors(n_graph, artist, max_depth=1):
+#     """
+#     Get neighbors of an artist up to a certain depth.
+#     Returns:
+#         - nodes_set: Set of all neighbor nodes
+#         - node_sizes: Dictionary of node sizes based on depth
+#         - node_colors: Dictionary of node colors based on depth
+#         - node_depths: Dictionary mapping nodes to their depths
+#     """
+#     nodes_set = set()
+#     node_depths = {artist: 0}
+    
+#     def explore_neighbors(node, current_depth):
+#         if current_depth > max_depth:
+#             return
+#         for neighbor in n_graph.neighbors(node):
+#             # Add neighbor to the set
+#             nodes_set.add(neighbor)
+#             # Record depth (use minimum if node is found through multiple paths)
+#             if neighbor not in node_depths or current_depth < node_depths[neighbor]:
+#                 node_depths[neighbor] = current_depth
+#             # Explore next level
+#             explore_neighbors(neighbor, current_depth + 1)
+    
+#     # Start exploration from the center artist
+#     explore_neighbors(artist, 1)
+    
+#     # Add the center artist to the set
+#     nodes_set.add(artist)
+    
+#     # Generate node sizes - bigger for center and closer nodes
+#     node_sizes = {}
+#     max_size = 300  # Max size for center node
+#     min_size = 100  # Min size for furthest nodes
+#     for node, depth_1 in node_depths.items():
+#         # Size decreases with depth: 300 for center, 200 for depth 1, etc.
+#         node_sizes[node] = max_size - (depth_1 * (max_size - min_size) / max_depth)
+    
+#     # Generate node colors - using a color gradient based on depth
+#     node_colors = {}
+#     for node, depth_1 in node_depths.items():
+#         # Color varies from red (center) to blue (max depth)
+#         if depth_1 == 0:
+#             node_colors[node] = 'red'  # Center node
+#         elif depth_1 == max_depth:
+#             node_colors[node] = 'blue'  # Furthest nodes
+#         else:
+#             # Nodes in between get intermediate colors
+#             node_colors[node] = f'#{int(255 - 255*(depth_1/max_depth)):02x}{0:02x}{int(255*(depth_1/max_depth)):02x}'
+    
+#     return nodes_set, node_sizes, node_colors, node_depths
+
+def get_neighbors(dataframe, artist, max_depth=1):
     """
     Get neighbors of an artist up to a certain depth.
     Returns:
@@ -17,48 +69,9 @@ def get_neighbors(n_graph, artist, max_depth=1):
         - node_colors: Dictionary of node colors based on depth
         - node_depths: Dictionary mapping nodes to their depths
     """
-    nodes_set = set()
-    node_depths = {artist: 0}
+
+    # Get all the artists in the dataframe that have
     
-    def explore_neighbors(node, current_depth):
-        if current_depth > max_depth:
-            return
-        for neighbor in n_graph.neighbors(node):
-            # Add neighbor to the set
-            nodes_set.add(neighbor)
-            # Record depth (use minimum if node is found through multiple paths)
-            if neighbor not in node_depths or current_depth < node_depths[neighbor]:
-                node_depths[neighbor] = current_depth
-            # Explore next level
-            explore_neighbors(neighbor, current_depth + 1)
-    
-    # Start exploration from the center artist
-    explore_neighbors(artist, 1)
-    
-    # Add the center artist to the set
-    nodes_set.add(artist)
-    
-    # Generate node sizes - bigger for center and closer nodes
-    node_sizes = {}
-    max_size = 300  # Max size for center node
-    min_size = 100  # Min size for furthest nodes
-    for node, depth_1 in node_depths.items():
-        # Size decreases with depth: 300 for center, 200 for depth 1, etc.
-        node_sizes[node] = max_size - (depth_1 * (max_size - min_size) / max_depth)
-    
-    # Generate node colors - using a color gradient based on depth
-    node_colors = {}
-    for node, depth_1 in node_depths.items():
-        # Color varies from red (center) to blue (max depth)
-        if depth_1 == 0:
-            node_colors[node] = 'red'  # Center node
-        elif depth_1 == max_depth:
-            node_colors[node] = 'blue'  # Furthest nodes
-        else:
-            # Nodes in between get intermediate colors
-            node_colors[node] = f'#{int(255 - 255*(depth_1/max_depth)):02x}{0:02x}{int(255*(depth_1/max_depth)):02x}'
-    
-    return nodes_set, node_sizes, node_colors, node_depths
 
 def generate_graph(center_artist, max_depth, mention_threshold, show_plot=False, save_plot=False):
     """
