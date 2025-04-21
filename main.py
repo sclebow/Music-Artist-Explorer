@@ -22,9 +22,6 @@ def filter_dataframe_with_neighbors(dataframe, artist, max_depth=1, display_df=F
     # Filter the DataFrame to include only rows with the artist as source
     filtered_df = dataframe[(dataframe['source'] == artist)]
 
-    # # Set the depth to 0 for the center artist
-    # filtered_df['depth'] = 0
-
     # Recursively find targets up to max_depth using a function
     def find_targets(dataframe, source_artist, depth_of_source, max_depth):
         # Base case: if the maximum depth is reached, return an empty DataFrame
@@ -49,33 +46,24 @@ def filter_dataframe_with_neighbors(dataframe, artist, max_depth=1, display_df=F
     
     filtered_df = pd.concat([filtered_df, find_targets(dataframe, artist, 0, max_depth)], ignore_index=True)
 
-    # # Filter the DataFrame to include only rows with the artist as target
-    # filtered_df_2 = dataframe[(dataframe['target'] == artist)]
-    # # st.markdown(f"Filtered dataframe shape after filtering: {filtered_df_2.shape}")
-    # # st.dataframe(filtered_df_2, use_container_width=True)  # Display the filtered dataframe in Streamlit
+    # Filter the DataFrame to include only rows with the artist as target
+    filtered_df_2 = dataframe[(dataframe['target'] == artist)]
 
-    # # Set the depth to 1 for the initial target artist
-    # filtered_df_2['depth'] = 1
-
-    # # Recursively find sources up to max_depth
-    # for depth in range(1, max_depth):
-    #     # Get the current depth's sources
-    #     current_sources = filtered_df_2['source'].unique()
+    # Recursively find sources up to max_depth
+    for depth in range(1, max_depth):
+        # Get the current depth's sources
+        current_sources = filtered_df_2['source'].unique()
         
-    #     # Filter the DataFrame to include only rows with the current sources as target
-    #     new_df = dataframe[dataframe['target'].isin(current_sources)]
-        
-    #     # Set the depth for these sources
-    #     new_df['depth'] = depth + 1
+        # Filter the DataFrame to include only rows with the current sources as target
+        new_df = dataframe[dataframe['target'].isin(current_sources)]
 
-    #     # Append to the filtered DataFrame
-    #     filtered_df_2 = pd.concat([filtered_df_2, new_df], ignore_index=True)
+        # Append to the filtered DataFrame
+        filtered_df_2 = pd.concat([filtered_df_2, new_df], ignore_index=True)
 
-    # # Append to the filtered DataFrame
-    # filtered_df = pd.concat([filtered_df, filtered_df_2], ignore_index=True)
+    # Append to the filtered DataFrame
+    filtered_df = pd.concat([filtered_df, filtered_df_2], ignore_index=True)
 
     # Remove duplicates, keeping the smallest depth
-    # filtered_df = filtered_df.sort_values('depth').drop_duplicates(subset=['source', 'target'], keep='first')
     filtered_df = filtered_df.drop_duplicates()
 
     # Reset the index
@@ -120,22 +108,12 @@ def generate_graph(center_artist, max_depth, mention_threshold):
         source = row['source']
         target = row['target']
         number_of_mentions = row['number_of_mentions']
-        # depth = row['depth']
         
         # Add nodes and edges to the graph
         if source not in graph:
             graph.add_node(source)
-            # graph.add_node(source, depth=depth)
-            # node_depths[source] = depth
-        # else:
-        #     # # print(f"Node {source} already exists in the graph.")
-        #     # Update depth if this path is shallower
-        #     if depth < node_depths[source]:
-        #         node_depths[source] = depth
         if target not in graph:
             graph.add_node(target)
-            # if target not in node_depths:
-            #     node_depths[target] = depth + 1
         graph.add_edge(source, target, weight=number_of_mentions)
 
         # # print(f'Progress: {index / total_lines:.2%}', end='\r')
