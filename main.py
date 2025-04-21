@@ -361,7 +361,7 @@ with col2:
 
 col1, col2 = st.columns(2, vertical_alignment="bottom")
 with col1:
-    mention_threshold = st.slider("Minimum mention threshold:", min_value=1, max_value=20, value=10, step=1, help="Minimum number of mentions to consider an artist connected.")
+    mention_threshold = st.slider("Minimum mention threshold:", min_value=1, max_value=20, value=8, step=1, help="Minimum number of mentions to consider an artist connected.")
 with col2:
     max_depth = st.slider("Maximum depth of connections:", min_value=1, max_value=10, value=2, step=1, help="Maximum depth of connections to visualize.")
 
