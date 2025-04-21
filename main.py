@@ -8,72 +8,88 @@ import matplotlib.patches as mpatches
 import random
 import io
 
-# def get_neighbors(n_graph, artist, max_depth=1):
-#     """
-#     Get neighbors of an artist up to a certain depth.
-#     Returns:
-#         - nodes_set: Set of all neighbor nodes
-#         - node_sizes: Dictionary of node sizes based on depth
-#         - node_colors: Dictionary of node colors based on depth
-#         - node_depths: Dictionary mapping nodes to their depths
-#     """
-#     nodes_set = set()
-#     node_depths = {artist: 0}
-    
-#     def explore_neighbors(node, current_depth):
-#         if current_depth > max_depth:
-#             return
-#         for neighbor in n_graph.neighbors(node):
-#             # Add neighbor to the set
-#             nodes_set.add(neighbor)
-#             # Record depth (use minimum if node is found through multiple paths)
-#             if neighbor not in node_depths or current_depth < node_depths[neighbor]:
-#                 node_depths[neighbor] = current_depth
-#             # Explore next level
-#             explore_neighbors(neighbor, current_depth + 1)
-    
-#     # Start exploration from the center artist
-#     explore_neighbors(artist, 1)
-    
-#     # Add the center artist to the set
-#     nodes_set.add(artist)
-    
-#     # Generate node sizes - bigger for center and closer nodes
-#     node_sizes = {}
-#     max_size = 300  # Max size for center node
-#     min_size = 100  # Min size for furthest nodes
-#     for node, depth_1 in node_depths.items():
-#         # Size decreases with depth: 300 for center, 200 for depth 1, etc.
-#         node_sizes[node] = max_size - (depth_1 * (max_size - min_size) / max_depth)
-    
-#     # Generate node colors - using a color gradient based on depth
-#     node_colors = {}
-#     for node, depth_1 in node_depths.items():
-#         # Color varies from red (center) to blue (max depth)
-#         if depth_1 == 0:
-#             node_colors[node] = 'red'  # Center node
-#         elif depth_1 == max_depth:
-#             node_colors[node] = 'blue'  # Furthest nodes
-#         else:
-#             # Nodes in between get intermediate colors
-#             node_colors[node] = f'#{int(255 - 255*(depth_1/max_depth)):02x}{0:02x}{int(255*(depth_1/max_depth)):02x}'
-    
-#     return nodes_set, node_sizes, node_colors, node_depths
-
-def get_neighbors(dataframe, artist, max_depth=1):
+def filter_dataframe_with_neighbors(dataframe, artist, max_depth=1, display_df=False):
     """
     Get neighbors of an artist up to a certain depth.
     Returns:
-        - nodes_set: Set of all neighbor nodes
-        - node_sizes: Dictionary of node sizes based on depth
-        - node_colors: Dictionary of node colors based on depth
-        - node_depths: Dictionary mapping nodes to their depths
+        - filtered_df: DataFrame containing only the rows with the artist as source or target, with depth 
     """
 
-    # Get all the artists in the dataframe that have
-    
+    # print()
+    # print()
+    # print(f'max_depth: {type(max_depth)}')
 
-def generate_graph(center_artist, max_depth, mention_threshold, show_plot=False, save_plot=False):
+    # Filter the DataFrame to include only rows with the artist as source
+    filtered_df = dataframe[(dataframe['source'] == artist)]
+
+    # # Set the depth to 0 for the center artist
+    # filtered_df['depth'] = 0
+
+    # Recursively find targets up to max_depth using a function
+    def find_targets(dataframe, source_artist, depth_of_source, max_depth):
+        # Base case: if the maximum depth is reached, return an empty DataFrame
+        if depth_of_source >= max_depth:
+            return pd.DataFrame()
+
+        # Filter the DataFrame to include only rows with the source artist as target
+        new_df = dataframe[dataframe['source'] == source_artist]
+
+        # Set the depth for these targets
+        # If the source of a row is the same as the source artist, set depth to depth_of_source
+        # If the source of a row is different from the source artist, set depth to depth_of_source + 1
+        # new_df['depth'] = depth_of_source + 1
+        # new_df['depth'] = depth_of_source + 1 if new_df['source'].iloc[0] != source_artist else depth_of_source
+
+        # Recursively find targets for these new sources
+        for index, row in new_df.iterrows():
+            target_artist = row['target']
+            new_df = pd.concat([new_df, find_targets(dataframe, target_artist, depth_of_source + 1, max_depth)], ignore_index=True)
+
+        return new_df
+    
+    filtered_df = pd.concat([filtered_df, find_targets(dataframe, artist, 0, max_depth)], ignore_index=True)
+
+    # # Filter the DataFrame to include only rows with the artist as target
+    # filtered_df_2 = dataframe[(dataframe['target'] == artist)]
+    # # st.markdown(f"Filtered dataframe shape after filtering: {filtered_df_2.shape}")
+    # # st.dataframe(filtered_df_2, use_container_width=True)  # Display the filtered dataframe in Streamlit
+
+    # # Set the depth to 1 for the initial target artist
+    # filtered_df_2['depth'] = 1
+
+    # # Recursively find sources up to max_depth
+    # for depth in range(1, max_depth):
+    #     # Get the current depth's sources
+    #     current_sources = filtered_df_2['source'].unique()
+        
+    #     # Filter the DataFrame to include only rows with the current sources as target
+    #     new_df = dataframe[dataframe['target'].isin(current_sources)]
+        
+    #     # Set the depth for these sources
+    #     new_df['depth'] = depth + 1
+
+    #     # Append to the filtered DataFrame
+    #     filtered_df_2 = pd.concat([filtered_df_2, new_df], ignore_index=True)
+
+    # # Append to the filtered DataFrame
+    # filtered_df = pd.concat([filtered_df, filtered_df_2], ignore_index=True)
+
+    # Remove duplicates, keeping the smallest depth
+    # filtered_df = filtered_df.sort_values('depth').drop_duplicates(subset=['source', 'target'], keep='first')
+    filtered_df = filtered_df.drop_duplicates()
+
+    # Reset the index
+    filtered_df = filtered_df.reset_index(drop=True)
+
+    # print(f"Filtered dataframe shape after filtering: {filtered_df.shape}")
+
+    if display_df:
+        with st.expander("Filtered DataFrame", expanded=False):
+            st.dataframe(filtered_df, use_container_width=True)  # Display the filtered dataframe in Streamlit
+    
+    return filtered_df
+
+def generate_graph(center_artist, max_depth, mention_threshold):
     """
     Generate a graph based on the Wikipedia mentions of artists.
     """
@@ -84,102 +100,127 @@ def generate_graph(center_artist, max_depth, mention_threshold, show_plot=False,
     df = pd.read_csv('wikipedia_music_graph.csv') # Columns source,target,number_of_mentions
 
     total_lines = len(df)
-    print(f'Total lines: {total_lines}')
+    # print(f'Total lines: {total_lines}')
 
     # Drop lines below the mention threshold
     df = df[df['number_of_mentions'] >= mention_threshold]
-    print(f'Lines after filtering by mention threshold: {len(df)}')
+    # print(f'Lines after filtering by mention threshold: {len(df)}')
 
+    # Filter the DataFrame to include only rows with the center artist as source or target
+    df = filter_dataframe_with_neighbors(df, center_artist, max_depth, display_df=True)
+    
     # Create a streamlit progress bar
     progress_bar = st.progress(0)
+
+    # Initialize node sizes, colors, and depths
+    node_depths = {}
 
     # Add nodes and edges based on your DataFrame
     for index, row in df.iterrows():
         source = row['source']
         target = row['target']
         number_of_mentions = row['number_of_mentions']
+        # depth = row['depth']
         
         # Add nodes and edges to the graph
-        graph.add_node(source)
-        graph.add_node(target)
+        if source not in graph:
+            graph.add_node(source)
+            # graph.add_node(source, depth=depth)
+            # node_depths[source] = depth
+        # else:
+        #     # # print(f"Node {source} already exists in the graph.")
+        #     # Update depth if this path is shallower
+        #     if depth < node_depths[source]:
+        #         node_depths[source] = depth
+        if target not in graph:
+            graph.add_node(target)
+            # if target not in node_depths:
+            #     node_depths[target] = depth + 1
         graph.add_edge(source, target, weight=number_of_mentions)
 
-        print(f'Progress: {index / total_lines:.2%}', end='\r')# Get subgraph nodes and styling information
+        # # print(f'Progress: {index / total_lines:.2%}', end='\r')
+
         # Update progress bar
         progress_bar.progress((index + 1) / total_lines)
+
+    # print(f'node_depths: {node_depths}')
 
     # Close the progress bar
     progress_bar.empty()
 
-    subgraph_nodes, node_sizes, node_colors, node_depths = get_neighbors(graph, center_artist, max_depth)
-    subgraph_nodes.add(center_artist)  # Include the center artist
+    node_sizes = {}
+    node_colors = {}
+    color_palette = sns.color_palette("coolwarm", n_colors=max_depth + 1)  # Color palette for depth levels
 
-    # Create a new graph instead of a subgraph view which is frozen
-    subgraph = nx.DiGraph()
-    # Copy nodes and edges from original graph
-    for node in subgraph_nodes:
-        subgraph.add_node(node)
-    for u, v, data in graph.edges(data=True):
-        if u in subgraph_nodes and v in subgraph_nodes:
-            subgraph.add_edge(u, v, **data)
+    def get_node_size(depth, max_depth):
+        """
+        Get node size based on depth.
+        """
+        min_size = 100
+        max_size = 300
+        size_range = max_size - min_size
+        size = min_size + ((max_depth - depth) / max_depth) * size_range
+        return size
+    print()
+    # Set node sizes and colors based on depth
+    for node in graph.nodes():
+        # Get the depth of the node from the center artist
+        if node == center_artist:
+            node_depths[node] = 0
+            node_sizes[node] = 300
+            node_colors[node] = color_palette[0]
+        else:
+            # Find the shortest path from the center artist to the node
+            try:
+                path_length = nx.shortest_path_length(graph, source=center_artist, target=node)
+                node_depths[node] = path_length
+                node_sizes[node] = get_node_size(node_depths[node], max_depth)
+                node_colors[node] = color_palette[node_depths[node]]
+            except nx.NetworkXNoPath:
+                node_depths[node] = float('inf')
+
+    # for node, depth in node_depths.items():
+    #     # Set node size based on depth
+    #     if depth == 0:
+    #         node_sizes[node] = 300
+    #     elif depth == 1:
+    #         node_sizes[node] = 200
+    #     else:
+    #         node_sizes[node] = 100
+    #     # Set node color based on depth, using the color palette
+    #     node_colors[node] = color_palette[depth]        
 
     # Create a custom layout with better node distribution
     # First, get initial positions
-    pos = nx.spring_layout(subgraph, k=1.0)  # Higher k means more repulsion
+    seed = 42  # Seed for reproducibility 
+
+    pos = nx.spring_layout(graph, k=1.0, seed=seed)  # Use a seed for reproducibility
 
     # Force center artist to be at the center (0,0)
     pos[center_artist] = (0, 0)
 
     # Run spring layout again with higher repulsion force and more iterations
-    pos = nx.spring_layout(subgraph, 
+    pos = nx.spring_layout(graph, 
                         pos=pos,               # Start with existing positions
                         fixed=[center_artist], # Keep center fixed
-                        k=1,                 # Higher repulsion between nodes
+                        k=100,                   # Higher repulsion between nodes
                         iterations=100,        # More iterations for better convergence
-                        weight='weight',       # Use edge weights
-                        seed=42)               # For reproducible layout
-
-    # Improve node distribution, especially for higher depths
-    for node in pos:
-        if node != center_artist:
-            # Scale based on depth to create more distinct "rings"
-            depth_factor = node_depths.get(node, 1)
-            # More aggressive scaling - create more distinct separation by depth
-            # Higher power (^1.5) creates more separation between depth levels
-            scaling_factor = (depth_factor ** 1.2) * 1  # Adjust scaling factor as needed
-            
-            # Scale by depth - deeper nodes further out
-            x, y = pos[node]
-            norm = (x**2 + y**2)**0.5  # Distance from center
-            if norm > 0:
-                # Increase distance for nodes of the same depth
-                pos[node] = (x/norm * scaling_factor, y/norm * scaling_factor)
-    
-    # Add jitter to prevent overlapping nodes at the same depth
-    random.seed(42)  # For reproducibility
-    jitter_amount = 2 # Amount of jitter to add
-    for node in pos:
-        if node != center_artist:
-            x, y = pos[node]
-            # Add small random offset
-            pos[node] = (
-                x + random.uniform(-jitter_amount, jitter_amount),
-                y + random.uniform(-jitter_amount, jitter_amount)
-            )
+                        weight='weight' * -1,       # Use edge weights, higher weights mean closer nodes
+                        seed=seed)               # For reproducible layout
 
     plt.figure(figsize=(10, 8))
 
     # Draw nodes with varying sizes and colors
-    nx.draw_networkx_nodes(subgraph, pos, 
-                        node_size=[node_sizes.get(node, 100) for node in subgraph.nodes()],
-                        node_color=[node_colors.get(node, 'lightblue') for node in subgraph.nodes()])
+    nx.draw_networkx_nodes(graph, pos, 
+                        node_size=[node_sizes.get(node, 100) for node in graph.nodes()],
+                        node_color=[node_colors.get(node, 'lightblue') for node in graph.nodes()])
 
     # Draw labels with bbox (background box)
-    nx.draw_networkx_labels(subgraph, pos, font_size=6, font_weight='bold', 
+    nx.draw_networkx_labels(graph, pos, font_size=6, font_weight='bold', 
                         bbox=dict(facecolor='white', edgecolor='none', alpha=0.7, pad=0.3))
 
     # Draw edge labels
-    edge_labels = nx.get_edge_attributes(subgraph, 'weight')
+    edge_labels = nx.get_edge_attributes(graph, 'weight')
 
     # Calculate edge widths and alpha based on weights
     max_width = 8.0
@@ -187,10 +228,10 @@ def generate_graph(center_artist, max_depth, mention_threshold, show_plot=False,
     max_alpha = 0.9
     min_alpha = 0.5
     # Normalize edge weights to get widths
-    edge_weights = [edge_labels[edge] for edge in subgraph.edges()]
+    edge_weights = [edge_labels[edge] for edge in graph.edges()]
     edge_widths = {}
     alphas = {}
-    for edge in subgraph.edges():
+    for edge in graph.edges():
         weight = edge_labels[edge]
         
         # Normalize weight to a range [min_width, max_width]
@@ -202,9 +243,9 @@ def generate_graph(center_artist, max_depth, mention_threshold, show_plot=False,
         alphas[edge] = alpha
 
     # Draw all edges as curves with calculated widths
-    for edge in subgraph.edges():
+    for edge in graph.edges():
         nx.draw_networkx_edges(
-            subgraph, pos,
+            graph, pos,
             edgelist=[edge],
             width=edge_widths[edge],
             alpha=alphas[edge],
@@ -215,7 +256,7 @@ def generate_graph(center_artist, max_depth, mention_threshold, show_plot=False,
     # Draw edge labels on curves
     for edge, weight in edge_labels.items():
         nx.draw_networkx_edge_labels(
-            subgraph, pos,
+            graph, pos,
             edge_labels={edge: weight},
             font_color='red',
             font_size=4,
@@ -226,24 +267,13 @@ def generate_graph(center_artist, max_depth, mention_threshold, show_plot=False,
 
     # Create a legend showing what each color means in terms of depth
     
-    # Get unique depths and sort them
-    unique_depths = sorted(set(node_depths.values()))
-    
     # Create legend handles
     legend_handles = []
-    for d in unique_depths:
-        # Find a node with this depth to get its color
-        for node, depth_2 in node_depths.items():
-            if depth_2 == d:
-                color = node_colors[node]
-                break
-                
-        if d == 0:
-            label = f"Depth {d}: {center_artist}"
+    for i, c in enumerate(color_palette):
+        if i == 0:
+            legend_handles.append(mpatches.Patch(color=c, label=f'Center Artist: {center_artist}'))
         else:
-            label = f"Depth {d}"
-            
-        legend_handles.append(mpatches.Patch(color=color, label=label))
+            legend_handles.append(mpatches.Patch(color=c, label=f'Depth {i}'))
     
     # Determine best location for legend by finding quadrant with fewest nodes
     top_right = sum(1 for x, y in pos.values() if x > 0 and y > 0)
@@ -265,9 +295,9 @@ def generate_graph(center_artist, max_depth, mention_threshold, show_plot=False,
               title="Distance from Center Artist",
               loc=best_position, 
               fontsize="small",
-              frameon=True,
-              facecolor="white",
-              edgecolor="lightgray")
+              frameon=False,
+              facecolor=(1, 1, 1, 0.0),  # White with some transparency
+              )
     
     title = f"""Subgraph of Musical Artist Wikipedia mentions on the Wikipedia page of {center_artist}\n\
         Depth: {max_depth}, Minimum Mention Threshold: {mention_threshold}"""
@@ -276,16 +306,6 @@ def generate_graph(center_artist, max_depth, mention_threshold, show_plot=False,
     plt.axis('off')  # Turn off axis
     plt.tight_layout()
 
-    # if save_plot:
-    #     # Save the figure as a PNG file
-    #     file_name = f'{center_artist}_{max_depth}_depth_{mention_threshold}_mention_threshold_subgraph.png'
-    #     plt.savefig(f'images/{file_name}', format='png', dpi=300, bbox_inches='tight')
-    #     print(f"Graph saved as {file_name}")
-
-    # if show_plot:
-    #     plt.show()
-
-    # # plt.close()
     return plt
 
 def get_random_artist():
@@ -302,13 +322,25 @@ st.set_page_config(page_title="Musical Artist Connectivity Analysis", layout="wi
 # Load CSS styles
 st.markdown('<style>' + open('styles.css').read() + '</style>', unsafe_allow_html=True) 
 
-st.title("Musical Artist Connectivity Analysis")
+# col1, col2 = st.columns([3, 1], gap="large", vertical_alignment="bottom")
+# with col1:
+#     st.title("Musical Artist Connectivity Analysis")
+# with col2:
+#     st.markdown("### by Scott Lebow")
+st.markdown("<h1 style='text-align: center;'>Musical Artist Connectivity Analysis</h1><h3 style='text-align: center;'>by Scott Lebow</h3>", unsafe_allow_html=True)
+st.markdown("----")
 st.write("This app analyzes the connections between musical artists based on their Wikipedia pages.  It uses a dataset of artists and their connections to visualize the relationships between them.")
 
 # Get all artists from the dataset
-df = pd.read_csv('wikipedia_music.csv')
+df = pd.read_csv('wikipedia_music_graph.csv')
 
-artists = df['ARTIST_NAME'].unique()
+with st.expander("Dataset Overview", expanded=False):
+    st.write("This dataset contains information about musical artists and their connections based on Wikipedia mentions.")
+    st.write("It is based on the Kaggle dataset [Wikipedia Music Graph](https://www.kaggle.com/datasets/matwario/wikipedia-music-links).")
+    st.write("Refactored by Scott Lebow for the purpose of this project.")
+    st.dataframe(df, use_container_width=True)  # Display the dataframe in Streamlit
+
+artists = df['source'].unique()
 
 # Default artist for the session
 default_artist = "The Beatles"
@@ -318,7 +350,7 @@ if 'artist' not in st.session_state:
 if 'artist_index' not in st.session_state:
     st.session_state.artist_index = np.where(artists == default_artist)[0][0]
 
-print(f"Default artist index: {st.session_state.artist_index}")
+# print(f"Default artist index: {st.session_state.artist_index}")
 
 col1, col2 = st.columns(2, vertical_alignment="bottom")
 with col1:
@@ -346,7 +378,7 @@ st.markdown(f"## Selected artist: {artist}")
 # if st.button("Generate graph", help="Click to generate the graph based on the selected artist and parameters.", key="generate_graph"):
 if True:  # Always generate the graph for demonstration purposes
     with st.spinner("Generating graph... (this may take a few seconds depending on the artist, threshold, and depth)"):
-        plot = generate_graph(artist, max_depth, mention_threshold, show_plot=False, save_plot=False)
+        plot = generate_graph(artist, max_depth, mention_threshold)
         success_message = st.success("Graph generated successfully!") # Show success message
         st.pyplot(plot, use_container_width=False)  # Adjusted to use the container width
 
