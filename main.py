@@ -31,12 +31,6 @@ def filter_dataframe_with_neighbors(dataframe, artist, max_depth=1, display_df=F
         # Filter the DataFrame to include only rows with the source artist as target
         new_df = dataframe[dataframe['source'] == source_artist]
 
-        # Set the depth for these targets
-        # If the source of a row is the same as the source artist, set depth to depth_of_source
-        # If the source of a row is different from the source artist, set depth to depth_of_source + 1
-        # new_df['depth'] = depth_of_source + 1
-        # new_df['depth'] = depth_of_source + 1 if new_df['source'].iloc[0] != source_artist else depth_of_source
-
         # Recursively find targets for these new sources
         for index, row in new_df.iterrows():
             target_artist = row['target']
@@ -56,6 +50,9 @@ def filter_dataframe_with_neighbors(dataframe, artist, max_depth=1, display_df=F
         
         # Filter the DataFrame to include only rows with the current sources as target
         new_df = dataframe[dataframe['target'].isin(current_sources)]
+
+        # Filter the DataFrame to include only rows with the current sources as source
+        new_df = new_df[new_df['source'].isin(current_sources)]
 
         # Append to the filtered DataFrame
         filtered_df_2 = pd.concat([filtered_df_2, new_df], ignore_index=True)
@@ -141,6 +138,9 @@ def generate_graph(center_artist, max_depth, mention_threshold):
         return size
     print()
     # Set node sizes and colors based on depth
+
+    # Initialize a list to keep track of nodes to remove
+    nodes_to_remove = []
     for node in graph.nodes():
         # Get the depth of the node from the center artist
         if node == center_artist:
@@ -151,11 +151,20 @@ def generate_graph(center_artist, max_depth, mention_threshold):
             # Find the shortest path from the center artist to the node
             try:
                 path_length = nx.shortest_path_length(graph, source=center_artist, target=node)
+                try:
+                    node_colors[node] = color_palette[path_length]
+                except IndexError:
+                    print(f"Node {node} exceeds max depth {max_depth}. Removing it.")
+                    nodes_to_remove.append(node)                    
+                    continue
                 node_depths[node] = path_length
                 node_sizes[node] = get_node_size(node_depths[node], max_depth)
-                node_colors[node] = color_palette[node_depths[node]]
             except nx.NetworkXNoPath:
                 node_depths[node] = float('inf')
+
+    for node in nodes_to_remove:
+        # Remove nodes that exceed the max depth
+        graph.remove_node(node)
 
     # for node, depth in node_depths.items():
     #     # Set node size based on depth
