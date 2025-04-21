@@ -203,7 +203,7 @@ def generate_graph(center_artist, max_depth, mention_threshold):
     pos = nx.spring_layout(graph, 
                         pos=pos,               # Start with existing positions
                         fixed=[center_artist], # Keep center fixed
-                        k=100,                   # Higher repulsion between nodes
+                        k=4,                   # Higher repulsion between nodes
                         iterations=100,        # More iterations for better convergence
                         weight='weight' * -1,       # Use edge weights, higher weights mean closer nodes
                         seed=seed)               # For reproducible layout
@@ -293,10 +293,11 @@ def generate_graph(center_artist, max_depth, mention_threshold):
     # Add the legend to the plot in best position
     plt.legend(handles=legend_handles, 
               title="Distance from Center Artist",
+              title_fontproperties={'size': "small"},
               loc=best_position, 
-              fontsize="small",
-              frameon=False,
-              facecolor=(1, 1, 1, 0.0),  # White with some transparency
+              fontsize="xx-small",
+              frameon=True,
+              facecolor=(1, 1, 1, 0.2),  # White with some transparency
               )
     
     title = f"""Subgraph of Musical Artist Wikipedia mentions on the Wikipedia page of {center_artist}\n\
