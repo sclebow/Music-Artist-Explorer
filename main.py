@@ -208,7 +208,7 @@ def generate_graph(center_artist, max_depth, mention_threshold):
                         weight='weight' * -1,       # Use edge weights, higher weights mean closer nodes
                         seed=seed)               # For reproducible layout
 
-    plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(10, 6))
 
     # Draw nodes with varying sizes and colors
     nx.draw_networkx_nodes(graph, pos, 
