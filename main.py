@@ -9,6 +9,30 @@ import random
 import io
 import gravis as gv
 
+def get_mention_threshold_values(artist, df):
+    """
+    Get the minimum, maximum, and default mention threshold values for the given artist.
+    """
+    # Get the number of mentions for the selected artist
+    mentions = df[df['source'] == artist]['number_of_mentions'].values
+    if len(mentions) > 0:
+        min_mention_threshold = int(mentions.min())
+        max_mention_threshold = int(mentions.max())
+        # default_mention_threshold = int(np.median(mentions))
+        # default_mention_threshold = int(np.mean(mentions))
+        # default_mention_threshold = int(np.percentile(mentions, 75))  # 75th percentile as default
+        default_mention_threshold = max(int(max_mention_threshold * 0.5), 1)  # 50% of max mentions
+        if min_mention_threshold == max_mention_threshold:
+            max_mention_threshold += 1
+    else:
+        min_mention_threshold = 1
+        max_mention_threshold = 20
+        default_mention_threshold = 8
+    
+    print(f"Artist: {artist}, Min: {min_mention_threshold}, Max: {max_mention_threshold}, Default: {default_mention_threshold}")
+
+    return min_mention_threshold, max_mention_threshold, default_mention_threshold
+
 def filter_dataframe_with_neighbors(dataframe, artist, max_depth=1, display_df=False):
     """
     Get neighbors of an artist up to a certain depth.
@@ -155,13 +179,13 @@ def generate_graph(center_artist, max_depth, mention_threshold, three_d=False):
                 try:
                     node_colors[node] = color_palette[path_length]
                 except IndexError:
-                    print(f"Node {node} exceeds max depth {max_depth}. Removing it.")
+                    # print(f"Node {node} exceeds max depth {max_depth}. Removing it.")
                     nodes_to_remove.append(node)                    
                     continue
                 node_depths[node] = path_length
                 node_sizes[node] = get_node_size(node_depths[node], max_depth)
             except nx.NetworkXNoPath:
-                print(f"Node {node} is not reachable from {center_artist}. Removing it.")
+                # print(f"Node {node} is not reachable from {center_artist}. Removing it.")
                 nodes_to_remove.append(node)
                 continue
 
@@ -269,7 +293,7 @@ def generate_graph(center_artist, max_depth, mention_threshold, three_d=False):
 
     for node in graph.nodes():
         depth = node_depths.get(node, 0)
-        print(f"Node: {node}, Depth: {depth}")
+        # print(f"Node: {node}, Depth: {depth}")
 
         color = color_palette[depth]
         # Convert the RGB tuple to hex color string for d3
@@ -371,12 +395,14 @@ def generate_graph(center_artist, max_depth, mention_threshold, three_d=False):
 
     # return plt
 
-def get_random_artist():
+def get_random_artist(df):
     """
     Get a random artist from the list of artists.
     """
-    df_0 = pd.read_csv('wikipedia_music.csv')
-    artists = df_0['ARTIST_NAME'].unique()
+    artists = df['source'].unique()
+    # Remove the current artist from the list of artists
+    current_artist = st.session_state.artist
+    artists = [artist for artist in artists if artist != current_artist]
     return random.choice(artists)
 
 # Streamlit app
@@ -413,7 +439,8 @@ if 'artist' not in st.session_state:
 if 'artist_index' not in st.session_state:
     st.session_state.artist_index = np.where(artists == default_artist)[0][0]
 
-# print(f"Default artist index: {st.session_state.artist_index}")
+# Determine the default values for the mention threshold slider
+mention_threshold_min, mention_threshold_max, mention_threshold_default = get_mention_threshold_values(st.session_state.artist, df)
 
 col1, col2 = st.columns(2, vertical_alignment="bottom")
 with col1:
@@ -423,14 +450,16 @@ with col2:
 
 col1, col2, col3 = st.columns(3, vertical_alignment="bottom")
 with col1:
-    mention_threshold = st.slider("Minimum mention threshold:", min_value=1, max_value=20, value=8, step=1, help="Minimum number of mentions to consider an artist connected.")
+    mention_threshold = st.slider("Minimum mention threshold:", min_value=mention_threshold_min, max_value=mention_threshold_max, 
+                                  value=mention_threshold_default, step=1,  
+                                  help="Minimum number of mentions to consider an artist connected.")
 with col2:
-    max_depth = st.slider("Maximum depth of connections:", min_value=1, max_value=10, value=2, step=1, help="Maximum depth of connections to visualize.")
+    max_depth = st.slider("Maximum depth of connections:", min_value=1, max_value=10, value=3, step=1, help="Maximum depth of connections to visualize.")
 with col3:
     three_d = st.checkbox("3D view", value=False, help="Check to view the graph in 3D.")
 
 if random_artist:
-    artist = get_random_artist()
+    artist = get_random_artist(df)  # Get a random artist
     st.session_state.artist = artist  # Store the random artist in session state
     st.session_state.artist_index = np.where(artists == artist)[0][0]  # Store the index of the random artist
     # Update the selectbox to reflect the random artist
@@ -445,23 +474,7 @@ if True:  # Always generate the graph for demonstration purposes
     with st.spinner("Generating graph... (this may take a few seconds depending on the artist, threshold, and depth)"):
         plot = generate_graph(artist, max_depth, mention_threshold, three_d=three_d)
         success_message = st.success("Graph generated successfully!") # Show success message
-        # st.pyplot(plot, use_container_width=False)  # Adjusted to use the container width
 
         st.components.v1.html(plot.to_html(), height=550)  # Display the graph using Streamlit's HTML component
 
         st.balloons()  # Show balloons animation when the graph is generated
-        
-        # # Remove the success message after a few seconds
-        # success_message.empty()
-
-        # # Add download button for the graph, set the dpi to 300 for better quality
-        # file_name = f'{artist}_{max_depth}_depth_{mention_threshold}_mention_threshold_subgraph.png'
-        # img = io.BytesIO()
-        # plot.savefig(img, format='png', dpi=300, bbox_inches='tight')
-        # st.download_button(
-        #     label="Download graph",
-        #     data=img,  # Get the figure as a PNG image
-        #     file_name=file_name,
-        #     mime="image/png",
-        #     help="Click to download the generated graph as a PNG file."
-        # )
