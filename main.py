@@ -92,10 +92,6 @@ def filter_dataframe_with_neighbors(dataframe, artist, max_depth=1, display_df=F
     filtered_df = filtered_df.reset_index(drop=True)
 
     # print(f"Filtered dataframe shape after filtering: {filtered_df.shape}")
-
-    if display_df:
-        with st.expander("Filtered DataFrame", expanded=False):
-            st.dataframe(filtered_df, use_container_width=True)  # Display the filtered dataframe in Streamlit
     
     return filtered_df
 
@@ -192,6 +188,12 @@ def generate_graph(center_artist, max_depth, mention_threshold, three_d=False):
     for node in nodes_to_remove:
         # Remove nodes that exceed the max depth
         graph.remove_node(node)
+        
+    # Remove the nodes from the dataframe if the node is in the source or target
+    df = df[~df['source'].isin(nodes_to_remove)]
+    df = df[~df['target'].isin(nodes_to_remove)]
+    with st.expander("Filtered DataFrame", expanded=False):
+        st.dataframe(df, use_container_width=True)  # Display the filtered dataframe in Streamlit
 
     # for node, depth in node_depths.items():
     #     # Set node size based on depth
@@ -210,7 +212,7 @@ def generate_graph(center_artist, max_depth, mention_threshold, three_d=False):
 
     pos = nx.spring_layout(graph, k=1.0, seed=seed)  # Use a seed for reproducibility
 
-    # Force center artist to be at the center (0,0)
+    # # Force center artist to be at the center (0,0)
     pos[center_artist] = (0, 0)
 
     # Run spring layout again with higher repulsion force and more iterations
