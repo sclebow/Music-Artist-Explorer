@@ -349,6 +349,7 @@ def generate_graph(center_artist, max_depth, mention_threshold, three_d=False):
                 many_body_force_strength=-300,
                 zoom_factor=1.5,
                 graph_height=550,
+                use_centering_force=True,
             )
     
     return renderer
