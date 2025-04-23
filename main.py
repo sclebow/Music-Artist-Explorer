@@ -7,6 +7,7 @@ import networkx as nx
 import matplotlib.patches as mpatches
 import random
 import io
+import gravis as gv
 
 def filter_dataframe_with_neighbors(dataframe, artist, max_depth=1, display_df=False):
     """
@@ -74,7 +75,7 @@ def filter_dataframe_with_neighbors(dataframe, artist, max_depth=1, display_df=F
     
     return filtered_df
 
-def generate_graph(center_artist, max_depth, mention_threshold):
+def generate_graph(center_artist, max_depth, mention_threshold, three_d=False):
     """
     Generate a graph based on the Wikipedia mentions of artists.
     """
@@ -160,7 +161,9 @@ def generate_graph(center_artist, max_depth, mention_threshold):
                 node_depths[node] = path_length
                 node_sizes[node] = get_node_size(node_depths[node], max_depth)
             except nx.NetworkXNoPath:
-                node_depths[node] = float('inf')
+                print(f"Node {node} is not reachable from {center_artist}. Removing it.")
+                nodes_to_remove.append(node)
+                continue
 
     for node in nodes_to_remove:
         # Remove nodes that exceed the max depth
@@ -195,7 +198,7 @@ def generate_graph(center_artist, max_depth, mention_threshold):
                         weight='weight' * -1,       # Use edge weights, higher weights mean closer nodes
                         seed=seed)               # For reproducible layout
 
-    plt.figure(figsize=(10, 6))
+    # plt.figure(figsize=(10, 6))
 
     # Draw nodes with varying sizes and colors
     nx.draw_networkx_nodes(graph, pos, 
@@ -239,6 +242,7 @@ def generate_graph(center_artist, max_depth, mention_threshold):
             edge_color='gray',
             connectionstyle='arc3,rad=0.15'  # All edges curved with same radius
         )
+        graph[edge[0]][edge[1]]['color'] = 'gray'  # Set edge color to gray
     
     # Draw edge labels on curves
     for edge, weight in edge_labels.items():
@@ -251,50 +255,121 @@ def generate_graph(center_artist, max_depth, mention_threshold):
             rotate=False,
             connectionstyle='arc3,rad=0.15'  # Match curve of the edges
         )
+    
+    # # Set node colors as node attributes in the graph
+    # for node, color in node_colors.items():
+    #     if node in graph.nodes():
+    #         color = color_palette[node_depths[node]]
+    #         print(f"Node: {node}, Color: {color}")
+    #         # Convert the RGB tuple to hex color string for d3
+    #         hex_color = f"#{int(color[0]*255):02x}{int(color[1]*255):02x}{int(color[2]*255):02x}"
+    #         graph.nodes[node]['color'] = hex_color
+    #         # Also add depth as a node attribute
+    #         graph.nodes[node]['depth'] = max_depth - node_depths.get(node, 0)
 
-    # Create a legend showing what each color means in terms of depth
-    
-    # Create legend handles
-    legend_handles = []
-    for i, c in enumerate(color_palette):
-        if i == 0:
-            legend_handles.append(mpatches.Patch(color=c, label=f'Center Artist: {center_artist}'))
-        else:
-            legend_handles.append(mpatches.Patch(color=c, label=f'Depth {i}'))
-    
-    # Determine best location for legend by finding quadrant with fewest nodes
-    top_right = sum(1 for x, y in pos.values() if x > 0 and y > 0)
-    top_left = sum(1 for x, y in pos.values() if x < 0 and y > 0)
-    bottom_right = sum(1 for x, y in pos.values() if x > 0 and y < 0)
-    bottom_left = sum(1 for x, y in pos.values() if x < 0 and y < 0)
-    
-    # Find quadrant with minimum node count
-    counts = {
-        'upper right': top_right, 
-        'upper left': top_left, 
-        'lower right': bottom_right, 
-        'lower left': bottom_left
-    }
-    best_position = min(counts, key=counts.get)
-    
-    # Add the legend to the plot in best position
-    plt.legend(handles=legend_handles, 
-              title="Distance from Center Artist",
-              title_fontproperties={'size': "small"},
-              loc=best_position, 
-              fontsize="xx-small",
-              frameon=True,
-              facecolor=(1, 1, 1, 0.2),  # White with some transparency
-              )
-    
-    title = f"""Subgraph of Musical Artist Wikipedia mentions on the Wikipedia page of {center_artist}\n\
-        Depth: {max_depth}, Minimum Mention Threshold: {mention_threshold}"""
+    for node in graph.nodes():
+        depth = node_depths.get(node, 0)
+        print(f"Node: {node}, Depth: {depth}")
 
-    plt.title(title)
-    plt.axis('off')  # Turn off axis
-    plt.tight_layout()
+        color = color_palette[depth]
+        # Convert the RGB tuple to hex color string for d3
+        hex_color = f"#{int(color[0]*255):02x}{int(color[1]*255):02x}{int(color[2]*255):02x}"
+        graph.nodes[node]['color'] = hex_color
+        # Also add depth as a node attribute
+        graph.nodes[node]['depth'] = max_depth - depth
 
-    return plt
+    if three_d:
+        renderer = gv.three(
+                graph,
+                use_node_size_normalization=True, 
+                node_size_normalization_max=30,
+                use_edge_size_normalization=True,
+                edge_size_data_source='weight', 
+                edge_curvature=0.3,
+                node_hover_neighborhood=True,
+                show_edge_label=True,
+                edge_label_data_source='weight',
+                node_label_size_factor=0.5,
+                edge_size_factor=0.5,
+                edge_label_size_factor=0.5,
+                node_size_data_source='depth',
+                layout_algorithm_active=True,
+                # use_links_force=True,
+                # links_force_distance=200,
+                use_many_body_force=True,
+                many_body_force_strength=-300,
+                zoom_factor=1.5,
+                graph_height=550,
+            )    
+    else:
+        renderer = gv.d3(
+                graph, 
+                use_node_size_normalization=True, 
+                node_size_normalization_max=30,
+                use_edge_size_normalization=True,
+                edge_size_data_source='weight', 
+                edge_curvature=0.3,
+                node_hover_neighborhood=True,
+                show_edge_label=True,
+                edge_label_data_source='weight',
+                node_label_size_factor=0.5,
+                edge_size_factor=0.5,
+                edge_label_size_factor=0.5,
+                node_size_data_source='depth',
+                layout_algorithm_active=True,
+                # use_links_force=True,
+                # links_force_distance=200,
+                use_many_body_force=True,
+                many_body_force_strength=-300,
+                zoom_factor=1.5,
+                graph_height=550,
+            )
+    
+    return renderer
+
+    # # Create a legend showing what each color means in terms of depth
+    
+    # # Create legend handles
+    # legend_handles = []
+    # for i, c in enumerate(color_palette):
+    #     if i == 0:
+    #         legend_handles.append(mpatches.Patch(color=c, label=f'Center Artist: {center_artist}'))
+    #     else:
+    #         legend_handles.append(mpatches.Patch(color=c, label=f'Depth {i}'))
+    
+    # # Determine best location for legend by finding quadrant with fewest nodes
+    # top_right = sum(1 for x, y in pos.values() if x > 0 and y > 0)
+    # top_left = sum(1 for x, y in pos.values() if x < 0 and y > 0)
+    # bottom_right = sum(1 for x, y in pos.values() if x > 0 and y < 0)
+    # bottom_left = sum(1 for x, y in pos.values() if x < 0 and y < 0)
+    
+    # # Find quadrant with minimum node count
+    # counts = {
+    #     'upper right': top_right, 
+    #     'upper left': top_left, 
+    #     'lower right': bottom_right, 
+    #     'lower left': bottom_left
+    # }
+    # best_position = min(counts, key=counts.get)
+    
+    # # Add the legend to the plot in best position
+    # plt.legend(handles=legend_handles, 
+    #           title="Distance from Center Artist",
+    #           title_fontproperties={'size': "small"},
+    #           loc=best_position, 
+    #           fontsize="xx-small",
+    #           frameon=True,
+    #           facecolor=(1, 1, 1, 0.2),  # White with some transparency
+    #           )
+    
+    # title = f"""Subgraph of Musical Artist Wikipedia mentions on the Wikipedia page of {center_artist}\n\
+    #     Depth: {max_depth}, Minimum Mention Threshold: {mention_threshold}"""
+
+    # plt.title(title)
+    # plt.axis('off')  # Turn off axis
+    # plt.tight_layout()
+
+    # return plt
 
 def get_random_artist():
     """
@@ -346,11 +421,13 @@ with col1:
 with col2:
     random_artist = st.button("Get random artist", help="Click to select a random artist from the dataset.")
 
-col1, col2 = st.columns(2, vertical_alignment="bottom")
+col1, col2, col3 = st.columns(3, vertical_alignment="bottom")
 with col1:
     mention_threshold = st.slider("Minimum mention threshold:", min_value=1, max_value=20, value=8, step=1, help="Minimum number of mentions to consider an artist connected.")
 with col2:
     max_depth = st.slider("Maximum depth of connections:", min_value=1, max_value=10, value=2, step=1, help="Maximum depth of connections to visualize.")
+with col3:
+    three_d = st.checkbox("3D view", value=False, help="Check to view the graph in 3D.")
 
 if random_artist:
     artist = get_random_artist()
@@ -366,22 +443,25 @@ st.markdown(f"## Selected artist: {artist}")
 # if st.button("Generate graph", help="Click to generate the graph based on the selected artist and parameters.", key="generate_graph"):
 if True:  # Always generate the graph for demonstration purposes
     with st.spinner("Generating graph... (this may take a few seconds depending on the artist, threshold, and depth)"):
-        plot = generate_graph(artist, max_depth, mention_threshold)
+        plot = generate_graph(artist, max_depth, mention_threshold, three_d=three_d)
         success_message = st.success("Graph generated successfully!") # Show success message
-        st.pyplot(plot, use_container_width=False)  # Adjusted to use the container width
+        # st.pyplot(plot, use_container_width=False)  # Adjusted to use the container width
+
+        st.components.v1.html(plot.to_html(), height=550)  # Display the graph using Streamlit's HTML component
 
         st.balloons()  # Show balloons animation when the graph is generated
-        # Remove the success message after a few seconds
-        success_message.empty()
+        
+        # # Remove the success message after a few seconds
+        # success_message.empty()
 
-        # Add download button for the graph, set the dpi to 300 for better quality
-        file_name = f'{artist}_{max_depth}_depth_{mention_threshold}_mention_threshold_subgraph.png'
-        img = io.BytesIO()
-        plot.savefig(img, format='png', dpi=300, bbox_inches='tight')
-        st.download_button(
-            label="Download graph",
-            data=img,  # Get the figure as a PNG image
-            file_name=file_name,
-            mime="image/png",
-            help="Click to download the generated graph as a PNG file."
-        )
+        # # Add download button for the graph, set the dpi to 300 for better quality
+        # file_name = f'{artist}_{max_depth}_depth_{mention_threshold}_mention_threshold_subgraph.png'
+        # img = io.BytesIO()
+        # plot.savefig(img, format='png', dpi=300, bbox_inches='tight')
+        # st.download_button(
+        #     label="Download graph",
+        #     data=img,  # Get the figure as a PNG image
+        #     file_name=file_name,
+        #     mime="image/png",
+        #     help="Click to download the generated graph as a PNG file."
+        # )
