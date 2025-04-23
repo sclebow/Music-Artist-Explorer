@@ -9,3 +9,8 @@
     padding: 10px;
     margin: 20px auto;
 }
+
+.stCheckbox {
+    display: flex;
+    justify-content: center;
+}
